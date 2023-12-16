@@ -863,6 +863,7 @@ typedef enum {
 	OPT_opcode,
 	OPT_opcode_ops,
 	OPT_opcode_method,
+	OPT_opcode_start,
 
 	OPT_open_ops,
 	OPT_open_fd,

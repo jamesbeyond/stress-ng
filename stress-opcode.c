@@ -44,6 +44,7 @@ static const stress_help_t help[] = {
 	{ NULL,	"opcode N",		"start N workers exercising random opcodes" },
 	{ NULL,	"opcode-method M",	"set opcode stress method (M = random, inc, mixed, text)" },
 	{ NULL,	"opcode-ops N",		"stop after N opcode bogo operations" },
+	{ NULL,	"opcode-start ADDR",		"start opcode from ADDR" },
 	{ NULL, NULL,		   NULL }
 };
 
@@ -246,7 +247,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register uint32_t tmp32 = *op & 0xffffffffL;
 			register uint32_t *ops = (uint32_t *)ops_begin;
 			register size_t i = (ssize_t)(page_size >> 2);
-
+			pr_inf("Opcodes 32:%x" PRIx32 "\n", tmp32);
 			while (i--) {
 				*(ops++) = tmp32;
 			}
@@ -275,7 +276,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register uint64_t tmp64 = *op;
 			register uint64_t *ops = (uint64_t *)ops_begin;
 			register size_t i = (ssize_t)(page_size >> 3);
-
+			pr_inf("Opcodes 64:0x%" PRIx64 "\n", tmp64);
 			while (i--)
 				*(ops++) = tmp64;
 		}
@@ -369,6 +370,38 @@ static int stress_set_opcode_method(const char *name)
 	return -1;
 }
 
+static int is_hex_string(const char *value) {
+	 // check "0x" or "0X" prefix
+    if (value[0] == '0' && (value[1] == 'x' || value[1] == 'X')) {
+        value += 2; // skip prefix
+    }
+
+    // check remaining char are HEX value
+    while (*value) {
+        if (!isxdigit((unsigned char)*value)) {
+            return 0; // not HEX value
+        }
+        value++;
+    }
+    return 1; // valid HEX value
+}
+static uint64_t opcode_start_address;
+static int stress_set_opcode_start(const char *value)
+{
+
+    if (!is_hex_string(value)) {
+		(void)fprintf(stderr, "opcode-start %s must be a valid HEX", value);
+        return -1;
+    }
+
+	if (sscanf(value, "%" SCNx64, &opcode_start_address)!= 1) {
+		(void)fprintf(stderr, "opcode-start number covert failed");
+        return -1; // scan failed
+    }
+	return 0;
+
+}
+
 /*
  *  stress_opcode
  *	stress with random opcodes
@@ -385,8 +418,9 @@ static int stress_opcode(stress_args_t *args)
 	const size_t opcode_bytes = 1;
 #endif
 	const size_t opcode_loops = page_size / opcode_bytes;
-	double op_start, rate, t, duration, percent;
-	const double num_opcodes = pow(2.0, STRESS_OPCODE_SIZE);
+	double rate, t, duration, percent;
+	uint64_t op_start;
+	const uint64_t total_opcodes =(uint64_t)pow(2.0, STRESS_OPCODE_SIZE);
 	uint64_t forks = 0;
 	void *opcodes;
 	/*
@@ -426,8 +460,13 @@ static int stress_opcode(stress_args_t *args)
 
 	stress_set_proc_state(args->name, STRESS_STATE_RUN);
 
-	op_start = (num_opcodes * (double)args->instance) / args->num_instances;
-	vstate->opcode = (uint64_t)op_start;
+	pr_inf("opcode-start address: 0x%" PRIx64 "\n", opcode_start_address);
+	//pr_inf("total opcode : %" PRIu64 "\n", total_opcodes);
+	uint64_t num_opcodes = total_opcodes-opcode_start_address;
+	//pr_inf("remain opcode : %" PRIu64 "\n", num_opcodes);
+	op_start = ((num_opcodes * args->instance) / args->num_instances) + opcode_start_address;
+	pr_inf("current stresser op start from : 0x%" PRIx64 "\n", op_start);
+	vstate->opcode = op_start;
 
 	t = stress_time_now();
 	do {
@@ -632,11 +671,13 @@ err:
 
 static void stress_opcode_set_default(void)
 {
-	stress_set_opcode_method("random");
+	stress_set_opcode_method("inc");
 }
+
 
 static const stress_opt_set_func_t opt_set_funcs[] = {
 	{ OPT_opcode_method,	stress_set_opcode_method },
+	{ OPT_opcode_start,		stress_set_opcode_start },
 	{ 0,			NULL }
 };
 
