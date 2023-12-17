@@ -249,7 +249,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register size_t i = (ssize_t)(page_size >> 2);
 			pr_inf("Opcodes 32: 0x%" PRIx32 "\n", tmp32);
 			while (i--) {
-				*(ops++) = tmp32;
+				*(ops++) = tmp32++;
 			}
 		}
 		break;
