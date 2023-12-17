@@ -247,7 +247,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register uint32_t tmp32 = *op & 0xffffffffL;
 			register uint32_t *ops = (uint32_t *)ops_begin;
 			register size_t i = (ssize_t)(page_size >> 2);
-			pr_inf("Opcodes 32:%x" PRIx32 "\n", tmp32);
+			pr_inf("Opcodes 32: 0x%" PRIx32 "\n", tmp32);
 			while (i--) {
 				*(ops++) = tmp32;
 			}
@@ -276,9 +276,9 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register uint64_t tmp64 = *op;
 			register uint64_t *ops = (uint64_t *)ops_begin;
 			register size_t i = (ssize_t)(page_size >> 3);
-			pr_inf("Opcodes 64:0x%" PRIx64 "\n", tmp64);
+			pr_inf("Opcodes 64: 0x%" PRIx64 "\n", tmp64);
 			while (i--)
-				*(ops++) = tmp64;
+				*(ops++) = (tmp64++);
 		}
 		break;
 	}
@@ -461,12 +461,13 @@ static int stress_opcode(stress_args_t *args)
 	stress_set_proc_state(args->name, STRESS_STATE_RUN);
 
 	pr_inf("opcode-start address: 0x%" PRIx64 "\n", opcode_start_address);
-	//pr_inf("total opcode : %" PRIu64 "\n", total_opcodes);
 	uint64_t num_opcodes = total_opcodes-opcode_start_address;
-	//pr_inf("remain opcode : %" PRIu64 "\n", num_opcodes);
 	op_start = ((num_opcodes * args->instance) / args->num_instances) + opcode_start_address;
 	pr_inf("current stresser op start from : 0x%" PRIx64 "\n", op_start);
 	vstate->opcode = op_start;
+	uint32_t step = page_size * 4 / STRESS_OPCODE_SIZE;
+	pr_inf("STEP 32: 0x%" PRIx32 "\n", step);
+
 
 	t = stress_time_now();
 	do {
@@ -582,7 +583,7 @@ again:
 exercise:
 #endif
 			for (i = 0, ops_ptr = ops_begin; i < opcode_loops; i++) {
-				vstate->opcode = (vstate->opcode + 1) & STRESS_OPCODE_MASK;
+				vstate->opcode = (vstate->opcode + step) & STRESS_OPCODE_MASK;
 				vstate->ops_attempted++;
 				(void)mprotect((void *)state, sizeof(*state), PROT_READ);
 
