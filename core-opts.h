@@ -864,6 +864,8 @@ typedef enum {
 	OPT_opcode_ops,
 	OPT_opcode_method,
 	OPT_opcode_start,
+	OPT_opcode_end,
+	OPT_opcode_step,
 
 	OPT_open_ops,
 	OPT_open_fd,

@@ -44,7 +44,9 @@ static const stress_help_t help[] = {
 	{ NULL,	"opcode N",		"start N workers exercising random opcodes" },
 	{ NULL,	"opcode-method M",	"set opcode stress method (M = random, inc, mixed, text)" },
 	{ NULL,	"opcode-ops N",		"stop after N opcode bogo operations" },
-	{ NULL,	"opcode-start ADDR",		"start opcode from ADDR" },
+	{ NULL,	"opcode-start ADDR",	"start opcode test from ADDR (inc mode only)" },
+	{ NULL,	"opcode-end ADDR",		"end opcode test when reach ADDR (inc mode only)" },
+	{ NULL,	"opcode-step N",		"skip 0xN between 2 opcodes, N is hex (inc mode only)" },
 	{ NULL, NULL,		   NULL }
 };
 
@@ -249,7 +251,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register size_t i = (ssize_t)(page_size >> 2);
 			pr_inf("Opcodes 32: 0x%" PRIx32 "\n", tmp32);
 			while (i--) {
-				*(ops++) = tmp32++;
+				*(ops++) = tmp32;
 			}
 		}
 		break;
@@ -278,7 +280,7 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register size_t i = (ssize_t)(page_size >> 3);
 			pr_inf("Opcodes 64: 0x%" PRIx64 "\n", tmp64);
 			while (i--)
-				*(ops++) = (tmp64++);
+				*(ops++) = (tmp64);
 		}
 		break;
 	}
@@ -385,10 +387,9 @@ static int is_hex_string(const char *value) {
     }
     return 1; // valid HEX value
 }
-static uint64_t opcode_start_address;
+static uint64_t opcode_start_address = 0x0;
 static int stress_set_opcode_start(const char *value)
 {
-
     if (!is_hex_string(value)) {
 		(void)fprintf(stderr, "opcode-start %s must be a valid HEX", value);
         return -1;
@@ -399,8 +400,42 @@ static int stress_set_opcode_start(const char *value)
         return -1; // scan failed
     }
 	return 0;
-
 }
+
+static uint64_t opcode_end_address = (uint64_t)pow(2.0, STRESS_OPCODE_SIZE);
+static int stress_set_opcode_end(const char *value)
+{
+    if (!is_hex_string(value)) {
+		(void)fprintf(stderr, "opcode-end %s must be a valid HEX", value);
+        return -1;
+    }
+
+	if (sscanf(value, "%" SCNx64, &opcode_end_address)!= 1) {
+		(void)fprintf(stderr, "opcode-end number covert failed");
+        return -1; // scan failed
+    }
+	if (opcode_end_address < opcode_start_address ) {
+		(void)fprintf(stderr, "opcode-end must greater than opcode-start");
+        return -1;
+    }
+	return 0;
+}
+
+static uint64_t opcode_step = 0x1;
+static int stress_set_opcode_step(const char *value)
+{
+    if (!is_hex_string(value)) {
+		(void)fprintf(stderr, "opcode-end %s must be a valid HEX", value);
+        return -1;
+    }
+
+	if (sscanf(value, "%" SCNx64, &opcode_step)!= 1) {
+		(void)fprintf(stderr, "opcode-end number covert failed");
+        return -1; // scan failed
+    }
+	return 0;
+}
+
 
 /*
  *  stress_opcode
@@ -420,7 +455,6 @@ static int stress_opcode(stress_args_t *args)
 	const size_t opcode_loops = page_size / opcode_bytes;
 	double rate, t, duration, percent;
 	uint64_t op_start;
-	const uint64_t total_opcodes =(uint64_t)pow(2.0, STRESS_OPCODE_SIZE);
 	uint64_t forks = 0;
 	void *opcodes;
 	/*
@@ -461,12 +495,13 @@ static int stress_opcode(stress_args_t *args)
 	stress_set_proc_state(args->name, STRESS_STATE_RUN);
 
 	pr_inf("opcode-start address: 0x%" PRIx64 "\n", opcode_start_address);
-	uint64_t num_opcodes = total_opcodes-opcode_start_address;
+	pr_inf("opcode-end address: 0x%" PRIx64 "\n", opcode_end_address);
+	pr_inf("opcode-step: 0x%" PRIx64 "\n", opcode_step);
+	uint64_t num_opcodes = (opcode_end_address - opcode_start_address);
+	pr_inf("total opcode to cover: 0x%" PRIx64 "\n", num_opcodes/opcode_step);
 	op_start = ((num_opcodes * args->instance) / args->num_instances) + opcode_start_address;
 	pr_inf("current stresser op start from : 0x%" PRIx64 "\n", op_start);
 	vstate->opcode = op_start;
-	uint32_t step = page_size * 4 / STRESS_OPCODE_SIZE;
-	pr_inf("STEP 32: 0x%" PRIx32 "\n", step);
 
 
 	t = stress_time_now();
@@ -583,7 +618,7 @@ again:
 exercise:
 #endif
 			for (i = 0, ops_ptr = ops_begin; i < opcode_loops; i++) {
-				vstate->opcode = (vstate->opcode + step) & STRESS_OPCODE_MASK;
+				vstate->opcode = (vstate->opcode + opcode_step) & STRESS_OPCODE_MASK;
 				vstate->ops_attempted++;
 				(void)mprotect((void *)state, sizeof(*state), PROT_READ);
 
@@ -612,7 +647,7 @@ exercise:
 			}
 			stress_bogo_inc(args);
 		}
-	} while (stress_continue(args));
+	} while (stress_continue(args) && (vstate->opcode <= opcode_end_address));
 
 finish:
 	duration = stress_time_now() - t;
@@ -679,6 +714,8 @@ static void stress_opcode_set_default(void)
 static const stress_opt_set_func_t opt_set_funcs[] = {
 	{ OPT_opcode_method,	stress_set_opcode_method },
 	{ OPT_opcode_start,		stress_set_opcode_start },
+	{ OPT_opcode_end,		stress_set_opcode_end },
+	{ OPT_opcode_step,		stress_set_opcode_step },
 	{ 0,			NULL }
 };
 
