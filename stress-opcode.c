@@ -44,9 +44,9 @@ static const stress_help_t help[] = {
 	{ NULL,	"opcode N",		"start N workers exercising random opcodes" },
 	{ NULL,	"opcode-method M",	"set opcode stress method (M = random, inc, mixed, text)" },
 	{ NULL,	"opcode-ops N",		"stop after N opcode bogo operations" },
-	{ NULL,	"opcode-start ADDR",	"start opcode test from ADDR (inc mode only)" },
-	{ NULL,	"opcode-end ADDR",		"end opcode test when reach ADDR (inc mode only)" },
-	{ NULL,	"opcode-step N",		"skip 0xN between 2 opcodes, N is hex (inc mode only)" },
+	{ NULL,	"opcode-start ADDR",	"start opcode test from ADDR, default 0x0 (inc mode only)" },
+	{ NULL,	"opcode-end ADDR",		"end opcode test when reach ADDR, default 0xF..F (inc mode only)" },
+	{ NULL,	"opcode-step N",		"skip 0xN between 2 opcodes, N is hex default 0x1 (inc mode only)" },
 	{ NULL, NULL,		   NULL }
 };
 
@@ -454,7 +454,7 @@ static int stress_opcode(stress_args_t *args)
 #endif
 	const size_t opcode_loops = page_size / opcode_bytes;
 	double rate, t, duration, percent;
-	uint64_t op_start;
+	uint64_t op_start, op_end;
 	uint64_t forks = 0;
 	void *opcodes;
 	/*
@@ -494,13 +494,14 @@ static int stress_opcode(stress_args_t *args)
 
 	stress_set_proc_state(args->name, STRESS_STATE_RUN);
 
-	pr_inf("opcode-start address: 0x%" PRIx64 "\n", opcode_start_address);
-	pr_inf("opcode-end address: 0x%" PRIx64 "\n", opcode_end_address);
-	pr_inf("opcode-step: 0x%" PRIx64 "\n", opcode_step);
+	pr_inf("TOTAL: opcode-start address: 0x%" PRIx64 "\n", opcode_start_address);
+	pr_inf("TOTAL: opcode-end address: 0x%" PRIx64 "\n", opcode_end_address);
+	pr_inf("TOTAL: opcode-step: 0x%" PRIx64 "\n", opcode_step);
 	uint64_t num_opcodes = (opcode_end_address - opcode_start_address);
-	pr_inf("total opcode to cover: 0x%" PRIx64 "\n", num_opcodes/opcode_step);
+	pr_inf("TOTAL: opcode to cover: 0x%" PRIx64 "\n", num_opcodes/opcode_step);
 	op_start = ((num_opcodes * args->instance) / args->num_instances) + opcode_start_address;
-	pr_inf("current stresser op start from : 0x%" PRIx64 "\n", op_start);
+	op_end = ((num_opcodes * (args->instance + 1)) / args->num_instances) + opcode_start_address - 1;
+	pr_inf("current stresser op start from : 0x%" PRIx64 "->0x%" PRIx64 "\n", op_start, op_end);
 	vstate->opcode = op_start;
 
 
@@ -647,7 +648,7 @@ exercise:
 			}
 			stress_bogo_inc(args);
 		}
-	} while (stress_continue(args) && (vstate->opcode <= opcode_end_address));
+	} while (stress_continue(args) && (vstate->opcode <= op_end));
 
 finish:
 	duration = stress_time_now() - t;
