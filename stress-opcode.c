@@ -249,6 +249,10 @@ static void OPTIMIZE3 stress_opcode_inc(
 			register uint32_t tmp32 = *op & 0xffffffffL;
 			register uint32_t *ops = (uint32_t *)ops_begin;
 			register size_t i = (ssize_t)(page_size >> 2);
+			if (((tmp32 & 0xffff) == 0x9002) || ((tmp32 >> 16 & 0xffff) == 0x9002) || (tmp32 == 0x100073)) {
+				pr_inf("Opcodes 32: 0x%" PRIx32 " ...SKIPING ebreak\n", tmp32);
+				break;
+			}
 			pr_inf("Opcodes 32: 0x%" PRIx32 "\n", tmp32);
 			while (i--) {
 				*(ops++) = tmp32;
@@ -576,7 +580,7 @@ again:
 			it.it_interval.tv_sec = 0;
 			it.it_interval.tv_usec = 15000;
 			it.it_value.tv_sec = 0;
-			it.it_value.tv_usec = 15000;
+			it.it_value.tv_usec = 60000;
 			if (setitimer(ITIMER_REAL, &it, NULL) < 0) {
 				pr_fail("%s: setitimer failed, errno=%d (%s)\n",
 					args->name, errno, strerror(errno));
